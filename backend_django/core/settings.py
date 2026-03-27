@@ -41,6 +41,7 @@ INSTALLED_APPS = [
 
 EXTERNAL_APP = [
     'rest_framework',
+    'accounts',
 ]
 
 INSTALLED_APPS += EXTERNAL_APP

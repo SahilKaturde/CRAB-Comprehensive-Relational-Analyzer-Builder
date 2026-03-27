@@ -1,6 +1,7 @@
 import os
 import zipfile
 import threading
+import traceback
 from datetime import datetime
 from django.conf import settings
 from rest_framework.views import APIView
@@ -9,14 +10,20 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .models import BackupRecord
 
+from django.db import close_old_connections
+
 def run_backup_job(record_id):
     try:
+        # 0. Handle database connections for the background thread
+        close_old_connections()
+        
         record = BackupRecord.objects.get(id=record_id)
         record.status = 'IN_PROGRESS'
         record.save()
 
         # Define paths
-        backup_dir = os.path.join(settings.BASE_DIR, 'secure_backups')
+        # Move storage to MEDIA_ROOT to align with FileField expectations
+        backup_dir = os.path.join(settings.MEDIA_ROOT, 'secure_backups')
         os.makedirs(backup_dir, exist_ok=True)
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -29,28 +36,43 @@ def run_backup_job(record_id):
                 db_path = os.path.join(settings.BASE_DIR, 'db.sqlite3')
                 if os.path.exists(db_path):
                     zipf.write(db_path, arcname='db.sqlite3')
+                else:
+                    raise FileNotFoundError(f"Database file not found at {db_path}")
 
-            # 2. Backup Media
+            # 2. Backup Media (Only user-uploaded content)
             if record.backup_type in ['FULL', 'MEDIA_ONLY']:
-                media_path = os.path.join(settings.BASE_DIR, 'uploads') # as per Dataset model
+                media_path = settings.MEDIA_ROOT
                 if os.path.exists(media_path):
                     for root, dirs, files in os.walk(media_path):
+                        # Avoid recursive backup (don't zip the backup folder itself)
+                        if 'secure_backups' in root:
+                            continue
+                            
                         for file in files:
                             file_path = os.path.join(root, file)
-                            arcname = os.path.relpath(file_path, settings.BASE_DIR)
+                            # Store relative to MEDIA_ROOT
+                            arcname = os.path.join('media', os.path.relpath(file_path, media_path))
                             zipf.write(file_path, arcname=arcname)
 
         record.status = 'COMPLETED'
+        # The storage expects a path relative to MEDIA_ROOT
         record.file.name = f"secure_backups/{zip_filename}"
         record.file_size_bytes = os.path.getsize(zip_path)
         record.completed_at = datetime.now()
         record.save()
 
     except Exception as e:
-        if 'record' in locals():
-            record.status = 'FAILED'
-            record.error_message = str(e)
-            record.save()
+        error_info = traceback.format_exc()
+        print(f"Backup Error: {error_info}")
+        try:
+            # Re-fetch or use local record if available
+            current_record = BackupRecord.objects.get(id=record_id)
+            current_record.status = 'FAILED'
+            current_record.error_message = f"{str(e)}\n\n{error_info[-1000:]}"
+            current_record.save()
+        except:
+            pass
+
 
 class StartBackupView(APIView):
     permission_classes = [IsAuthenticated]
@@ -81,6 +103,7 @@ class ListBackupsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        # SECURITY: Only show backups triggered by the current user unless they are a superuser
         if request.user.is_superuser:
             backups = BackupRecord.objects.all().order_by('-created_at')
         else:
@@ -96,14 +119,18 @@ class ListBackupsView(APIView):
                 "completed_at": b.completed_at,
                 "file_size_bytes": b.file_size_bytes,
                 "error_message": b.error_message,
+                "file_url": b.file.url if b.file else None,
+                "is_owner": True
             })
         return Response(data)
+
 
 class DeleteBackupView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
         try:
+            # SECURITY: Only allow deleting own backups unless superuser
             if request.user.is_superuser:
                 backup = BackupRecord.objects.get(id=pk)
             else:

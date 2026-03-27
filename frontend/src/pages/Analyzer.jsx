@@ -47,10 +47,64 @@ function StepBar({ currentStep, steps }) {
 }
 
 // ════════════════════════════════════════════════════════
+//  MARKDOWN RENDERER — NEO-BRUTALIST PARSING
+// ════════════════════════════════════════════════════════
+const MarkdownRenderer = ({ content }) => {
+  // Simple regex-based markdown parser for bold, lists, and tables
+  let html = content;
+
+  // 1. Tables (Extract and format)
+  const tableRegex = /\|(.+)\|[\n\r]\s*\|(?:[:\s-]+\|)+\s*[\n\r]((?:\|.+|[\n\r])*)/g;
+  html = html.replace(tableRegex, (match, headerRow, body) => {
+    const headers = headerRow.split('|').filter(h => h.trim()).map(h => h.trim());
+    const bodyRows = body.split('\n').filter(r => r.trim()).map(row => {
+      return row.split('|').filter(c => c.trim()).map(c => c.trim());
+    });
+
+    return `
+      <div class="my-4 border-2 border-black overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
+        <table class="w-full text-[11px] font-mono">
+          <thead class="bg-crab-accent/5 border-b-2 border-black">
+            <tr>
+              ${headers.map(h => `<th class="p-2 border-r border-black last:border-r-0 text-left uppercase">${h}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${bodyRows.map(row => `
+              <tr class="border-b border-black last:border-b-0">
+                ${row.map(cell => `<td class="p-2 border-r border-black last:border-r-0">${cell}</td>`).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  });
+
+  // 2. Bold text (**text**)
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  
+  // 3. Newlines to <br/>
+  html = html.replace(/\n/g, '<br/>');
+
+  return (
+    <div 
+      className="markdown-content" 
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+};
+
+// ════════════════════════════════════════════════════════
 //  MAIN ANALYZER COMPONENT
 // ════════════════════════════════════════════════════════
 export default function Analyzer() {
   const STEPS = ["INGEST", "CONVERT", "RELATIONSHIPS", "ANALYTICS", "AI CHAT"];
+
+  const fileInputRef = useRef(null);
+  const scrollRef = useRef(null);
+  const graphContainerRef = useRef(null);
+  const [graphDimensions, setGraphDimensions] = useState({ width: 800, height: 420 });
 
   // --- PIPELINE STATE ---
   const [currentStep, setCurrentStep] = useState(1);
@@ -79,13 +133,8 @@ export default function Analyzer() {
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [leftTab, setLeftTab] = useState("analytics"); // "datasets" | "relationships" | "analytics"
 
-  const fileInputRef = useRef(null);
-  const scrollRef = useRef(null);
-  const graphContainerRef = useRef(null);
-  const [graphDimensions, setGraphDimensions] = useState({ width: 800, height: 420 });
-
-  // Initialize SQL.js
   const [SQL, setSQL] = useState(null);
   useEffect(() => {
     window.initSqlJs({
@@ -102,7 +151,8 @@ export default function Analyzer() {
 
   // Measure graph container for proper sizing
   useEffect(() => {
-    if (currentStep === 3 && graphContainerRef.current) {
+    const shouldObserve = (currentStep === 3 || (currentStep === 5 && leftTab === "relationships"));
+    if (shouldObserve && graphContainerRef.current) {
       const obs = new ResizeObserver((entries) => {
         for (const entry of entries) {
           setGraphDimensions({
@@ -114,7 +164,7 @@ export default function Analyzer() {
       obs.observe(graphContainerRef.current);
       return () => obs.disconnect();
     }
-  }, [currentStep, discoveryLoading]);
+  }, [currentStep, discoveryLoading, leftTab]);
 
   // ════════════════════════════════════════════════════════
   //  STEP 1: INGEST
@@ -629,178 +679,474 @@ export default function Analyzer() {
           </div>
         )}
 
-        {/* ══════ STEP 4 & 5: ANALYTICS + CHAT ══════ */}
-        {(currentStep === 4 || currentStep === 5) && profileData && (
+        {/* ══════ STEP 4: ANALYTICS (before chat unlocked) ══════ */}
+        {currentStep === 4 && profileData && (
+          <div className="max-w-5xl mx-auto w-full overflow-y-auto p-6 lg:p-8 animate-fade-in">
+            <div className="space-y-6">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.5em] text-black/30 mb-2">Step 04</p>
+                <h2 className="text-3xl font-black uppercase tracking-tight">Data Quality</h2>
+                <p className="font-mono text-xs text-black/40 mt-1 uppercase">Session {sessionId?.slice(0, 8)} · {profileData.summary.total_tables} tables</p>
+              </div>
+
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-0 border-2 border-black divide-x divide-black transition-all">
+                {[
+                  { label: "TABLES", value: profileData.summary.total_tables, accent: false },
+                  { label: "ROWS", value: profileData.summary.total_rows.toLocaleString(), accent: false },
+                  { label: "COLUMNS", value: profileData.summary.total_columns, accent: false },
+                  { label: "COMPLETE", value: `${profileData.summary.overall_completeness}%`, accent: true },
+                  { label: "DEPTH", value: `D${profileData.summary.depth_code}`, accent: true },
+                ].map((card, i) => (
+                  <div key={i} className={`p-5 bg-white relative overflow-hidden group`}>
+                    {card.accent && <div className="absolute top-0 left-0 w-full h-1.5 bg-crab-accent" />}
+                    <p className="font-mono text-[8px] uppercase text-black/40 tracking-widest">{card.label}</p>
+                    <p className={`font-mono text-2xl font-black mt-2 ${card.accent ? "text-crab-accent" : "text-black"}`}>
+                      {card.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Per-Table Profiles */}
+              {Object.entries(profileData.tables).map(([tName, tData]) => (
+                <div key={tName} className="bg-white border-2 border-black relative group transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(255,59,48,1)] overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-crab-accent opacity-20 group-hover:opacity-100 transition-opacity" />
+                  <div className="p-4 border-b border-black/10 flex items-center justify-between">
+                    <h3 className="font-mono text-[10px] font-black uppercase text-black/80">{tName}</h3>
+                    <div className="flex items-center gap-4 font-mono text-[9px] uppercase text-black/30">
+                      <span>{tData.row_count} rows</span>
+                      <span>{tData.column_count} cols</span>
+                      <span className={`font-black tracking-tighter ${tData.completeness >= 90 ? "text-green-500" : tData.completeness >= 70 ? "text-yellow-500" : "text-crab-accent"}`}>
+                        {tData.completeness}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="px-4 pt-2 pb-1">
+                    <div className="w-full h-1.5 bg-black/5">
+                      <div className={`h-full transition-all ${tData.completeness >= 90 ? "bg-green-500" : tData.completeness >= 70 ? "bg-yellow-500" : "bg-crab-accent"}`} style={{ width: `${tData.completeness}%` }} />
+                    </div>
+                  </div>
+                  <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {tData.columns.map((col, i) => (
+                      <div key={i} className="p-3 border border-black/10 hover:border-black transition-colors">
+                        <p className="font-mono text-[9px] font-black uppercase truncate">{col.name}</p>
+                        <p className="font-mono text-[10px] text-black/40 mt-0.5">{col.dtype}</p>
+                        <div className="flex justify-between mt-2 text-[8px] font-mono text-black/25 uppercase">
+                          <span>{col.null_pct}% null</span>
+                          <span>{col.unique_count} uniq</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Unlock Chat Button */}
+              <div className="flex justify-center pt-4 pb-12">
+                <button onClick={() => { setCurrentStep(5); setLeftTab("analytics"); setMessages(prev => prev.length === 0 ? [{ role: "assistant", content: `Pipeline complete. I have access to ${profileData.summary.total_tables} table(s) with ${profileData.summary.total_rows} rows. Ask me anything about your data.` }] : prev); }} className="brutalist-btn-primary !py-4 !w-auto px-16 text-sm font-heading shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                  UNLOCK AI AGENT
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════ STEP 5: SPLIT VIEW — LEFT TABS + RIGHT CHAT ══════ */}
+        {currentStep === 5 && (
           <div className="flex h-full">
-            {/* LEFT: Analytics Panel */}
-            <div className={`${currentStep === 5 ? "w-3/5" : "w-full"} overflow-y-auto p-6 lg:p-8 transition-all`}>
-              <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.5em] text-black/30 mb-2">Step 04</p>
-                  <h2 className="text-3xl font-black uppercase tracking-tight">Data Quality</h2>
-                  <p className="font-mono text-xs text-black/40 mt-1 uppercase">Session {sessionId?.slice(0, 8)} · {profileData.summary.total_tables} tables</p>
-                </div>
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-0 border-2 border-black divide-x divide-black transition-all">
-                  {[
-                    { label: "TABLES", value: profileData.summary.total_tables, accent: false },
-                    { label: "ROWS", value: profileData.summary.total_rows.toLocaleString(), accent: false },
-                    { label: "COLUMNS", value: profileData.summary.total_columns, accent: false },
-                    { label: "COMPLETE", value: `${profileData.summary.overall_completeness}%`, accent: true },
-                    { label: "DEPTH", value: `D${profileData.summary.depth_code}`, accent: true },
-                  ].map((card, i) => (
-                    <div key={i} className={`p-5 bg-white relative overflow-hidden group`}>
-                      {card.accent && <div className="absolute top-0 left-0 w-full h-1.5 bg-crab-accent" />}
-                      <p className="font-mono text-[8px] uppercase text-black/40 tracking-widest">{card.label}</p>
-                      <p className={`font-mono text-2xl font-black mt-2 ${card.accent ? "text-crab-accent" : "text-black"}`}>
-                        {card.value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+            {/* ═══ LEFT PANEL: Switchable Tabs ═══ */}
+            <div className="flex-1 flex flex-col overflow-hidden border-r-2 border-black">
+              
+              {/* Tab Bar */}
+              <div className="flex border-b-2 border-black bg-white shrink-0">
+                {[
+                  { key: "datasets", label: "DATASETS", icon: "◫" },
+                  { key: "relationships", label: "ERD", icon: "◈" },
+                  { key: "analytics", label: "ANALYTICS", icon: "▤" },
+                ].map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setLeftTab(tab.key)}
+                    className={`flex-1 py-4 px-4 font-mono text-[9px] uppercase tracking-widest transition-all border-r border-black/10 last:border-r-0 relative group ${
+                      leftTab === tab.key
+                        ? "bg-crab-accent text-white font-black"
+                        : "bg-[#f9f9f9] text-black/40 hover:text-black hover:bg-black/5"
+                    }`}
+                  >
+                    {leftTab === tab.key && (
+                      <div className="absolute inset-0 border-t-4 border-white/20"></div>
+                    )}
+                    <span className={`mr-1.5 ${leftTab === tab.key ? "text-black" : "text-crab-accent/40 group-hover:text-crab-accent"}`}>{tab.icon}</span>
+                    <span className={leftTab === tab.key ? "text-black" : ""}>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
 
-                {/* Per-Table Profiles */}
-                {Object.entries(profileData.tables).map(([tName, tData]) => (
-                  <div key={tName} className="bg-white border-2 border-black relative group transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(255,59,48,1)] overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-crab-accent opacity-20 group-hover:opacity-100 transition-opacity" />
-                    <div className="p-4 border-b border-black/10 flex items-center justify-between">
-                      <h3 className="font-mono text-[10px] font-black uppercase text-black/80">{tName}</h3>
-                      <div className="flex items-center gap-4 font-mono text-[9px] uppercase text-black/30">
-                        <span>{tData.row_count} rows</span>
-                        <span>{tData.column_count} cols</span>
-                        <span className={`font-black tracking-tighter ${tData.completeness >= 90 ? "text-green-500" : tData.completeness >= 70 ? "text-yellow-500" : "text-crab-accent"}`}>
-                          {tData.completeness}%
-                        </span>
+              {/* Tab Content */}
+              <div className="flex-1 overflow-y-auto bg-[#ffffff]">
+
+                {/* ─── DATASETS TAB ─── */}
+                {leftTab === "datasets" && (
+                  <div className="max-w-5xl mx-auto p-6 space-y-6 animate-fade-in">
+                    <div className="flex items-center gap-6 pb-4 border-b border-black/5">
+                      <div className="w-12 h-12 border-2 border-crab-accent/20 p-1.5 shrink-0">
+                        <img src={logo} alt="CRAB" className="w-full h-full object-contain" />
+                      </div>
+                      <div>
+                        <p className="font-mono text-[10px] uppercase tracking-[0.5em] text-crab-accent mb-1">Datasets</p>
+                        <h2 className="text-xl font-black uppercase tracking-tight">{tables.length} Table(s) Loaded</h2>
                       </div>
                     </div>
-                    {/* Completeness Bar */}
-                    <div className="px-4 pt-2 pb-1">
-                      <div className="w-full h-1.5 bg-black/5">
-                        <div className={`h-full transition-all ${tData.completeness >= 90 ? "bg-green-500" : tData.completeness >= 70 ? "bg-yellow-500" : "bg-crab-accent"}`} style={{ width: `${tData.completeness}%` }} />
-                      </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {tables.map(t => {
+                        const info = filesData[t]?.info;
+                        const isConverted = info?.converted;
+                        const isSelected = selectedTable === t;
+                        return (
+                          <button
+                            key={t}
+                            onClick={() => loadLocalTable(t)}
+                            className={`group p-5 text-left border-2 transition-all relative ${
+                              isSelected
+                                ? "bg-white border-crab-accent shadow-[4px_4px_0px_0px_rgba(255,59,48,1)] translate-x-[-2px] translate-y-[-2px]"
+                                : "bg-white border-black/10 hover:border-black/40 shadow-none hover:bg-black/5"
+                            }`}
+                          >
+                            {isSelected && <div className="absolute top-0 left-0 w-full h-1 bg-crab-accent" />}
+                            <p className={`font-mono text-[10px] font-black uppercase truncate ${isSelected ? "text-crab-accent" : "text-black/70"}`}>
+                              {info?.name || t}
+                            </p>
+                            <div className="flex items-center gap-2 mt-3 text-[8px] uppercase font-mono tracking-widest text-black/30">
+                              <span className={isSelected ? "text-crab-accent/60" : ""}>{info?.type}</span>
+                              <span>•</span>
+                              <span className={isSelected ? "text-crab-accent/60" : ""}>{info?.size}</span>
+                              {isConverted && (
+                                <span className="ml-auto bg-crab-accent text-white px-2 py-0.5 font-black text-[7px] leading-none">CSV_SYNCED</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                    {/* Column Grid */}
-                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                      {tData.columns.map((col, i) => (
-                        <div key={i} className="p-3 border border-black/10 hover:border-black transition-colors">
-                          <p className="font-mono text-[9px] font-black uppercase truncate">{col.name}</p>
-                          <p className="font-mono text-[10px] text-black/40 mt-0.5">{col.dtype}</p>
-                          <div className="flex justify-between mt-2 text-[8px] font-mono text-black/25 uppercase">
-                            <span>{col.null_pct}% null</span>
-                            <span>{col.unique_count} uniq</span>
+
+                    {tableData.length > 0 && (
+                      <div className="border-2 border-black bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,0.05)]">
+                        <div className="p-3 border-b-2 border-black flex items-center justify-between bg-[#f9f9f9]">
+                          <h3 className="font-mono text-[10px] font-black uppercase">Preview: {filesData[selectedTable]?.info?.name || selectedTable}</h3>
+                          <span className="font-mono text-[8px] text-black/30 uppercase">{tableData.length} rows</span>
+                        </div>
+                        <div className="max-h-[320px] overflow-auto">
+                          <CsvDataTable data={tableData.slice(0, 30)} columns={tableColumns} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ─── RELATIONSHIPS TAB ─── */}
+                {leftTab === "relationships" && (
+                  <div className="max-w-5xl mx-auto p-6 space-y-6 animate-fade-in">
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-[0.5em] text-crab-accent mb-2">Relationships</p>
+                      <h2 className="text-xl font-black uppercase tracking-tight">Entity-Relationship Map</h2>
+                      <p className="font-mono text-xs text-black/40 mt-1 uppercase">{relationships.length} relationship(s) · {graphData.nodes.length} entities</p>
+                    </div>
+
+                    {/* Relationship Summary Cards */}
+                    {relationships.length > 0 && (
+                      <div className="grid grid-cols-3 gap-0 border-2 border-black divide-x-2 divide-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                        {(() => {
+                          const oneToOne = relationships.filter(r => r.Relationship === "1 : 1");
+                          const oneToMany = relationships.filter(r => r.Relationship === "1 : MANY");
+                          const manyToMany = relationships.filter(r => r.Relationship === "MANY : MANY");
+                          return (
+                            <>
+                              <div className="p-4 bg-white">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <div className="w-2.5 h-2.5 bg-green-500"></div>
+                                  <h3 className="font-mono text-[10px] font-black uppercase">1 : 1</h3>
+                                  <span className="ml-auto font-mono text-lg font-black text-green-500">{oneToOne.length}</span>
+                                </div>
+                                {oneToOne.map((r, i) => (
+                                  <p key={i} className="font-mono text-[9px] text-black/50 mb-0.5">{r["Entity A"]} ↔ {r["Entity B"]}</p>
+                                ))}
+                              </div>
+                              <div className="p-4 bg-white">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <div className="w-2.5 h-2.5 bg-black"></div>
+                                  <h3 className="font-mono text-[10px] font-black uppercase">1 : MANY</h3>
+                                  <span className="ml-auto font-mono text-lg font-black text-black">{oneToMany.length}</span>
+                                </div>
+                                {oneToMany.map((r, i) => (
+                                  <p key={i} className="font-mono text-[9px] text-black/50 mb-0.5">{r["Entity A"]} → {r["Entity B"]}</p>
+                                ))}
+                              </div>
+                              <div className="p-4 bg-white">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <div className="w-2.5 h-2.5 bg-crab-accent"></div>
+                                  <h3 className="font-mono text-[10px] font-black uppercase">M : M</h3>
+                                  <span className="ml-auto font-mono text-lg font-black text-crab-accent">{manyToMany.length}</span>
+                                </div>
+                                {manyToMany.map((r, i) => (
+                                  <p key={i} className="font-mono text-[9px] text-black/50 mb-0.5">{r["Entity A"]} ⇌ {r["Entity B"]}</p>
+                                ))}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {/* ERD Graph */}
+                    <div className="border-2 border-black bg-white relative shadow-[6px_6px_0px_0px_rgba(0,0,0,0.05)]">
+                      <div className="px-4 py-2 border-b-2 border-black bg-[#f9f9f9] flex items-center justify-between">
+                        <span className="font-mono text-[10px] font-black uppercase">Topology Graph</span>
+                        <div className="flex items-center gap-4 font-mono text-[8px] text-black/30">
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-green-500 inline-block"></span> 1:1</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-black inline-block"></span> 1:M</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-crab-accent inline-block"></span> M:M</span>
+                        </div>
+                      </div>
+                      <div ref={graphContainerRef} className="graph-container" style={{ height: "380px" }}>
+                        {graphData.nodes.length > 0 ? (
+                          <ForceGraph2D
+                            graphData={graphData}
+                            width={graphDimensions.width}
+                            height={graphDimensions.height}
+                            nodeLabel="name"
+                            nodeColor={() => "#1a1a1a"}
+                            linkColor={link => link.color || "#1a1a1a"}
+                            linkWidth={2}
+                            linkLabel="label"
+                            linkDirectionalArrowLength={6}
+                            linkDirectionalArrowRelPos={1}
+                            backgroundColor="#ffffff"
+                            nodeCanvasObject={(node, ctx, globalScale) => {
+                              const label = node.name;
+                              const fontSize = 11 / globalScale;
+                              ctx.font = `800 ${fontSize}px 'Inter', sans-serif`;
+                              const textWidth = ctx.measureText(label).width;
+                              const pad = fontSize * 0.6;
+                              const bw = textWidth + pad * 2;
+                              const bh = fontSize + pad;
+                              ctx.fillStyle = '#1a1a1a';
+                              ctx.fillRect(node.x - bw / 2, node.y - bh / 2, bw, bh);
+                              ctx.textAlign = 'center';
+                              ctx.textBaseline = 'middle';
+                              ctx.fillStyle = '#ffffff';
+                              ctx.fillText(label, node.x, node.y);
+                            }}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full">
+                            <span className="font-mono text-sm text-black/10 uppercase">No connections detected</span>
                           </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* AI Summary */}
+                    {aiSummary && (
+                      <div className="p-6 bg-[#1a1a1a] text-white border-2 border-black relative overflow-hidden group">
+                        <div className="absolute top-0 left-0 w-1.5 h-full bg-crab-accent"></div>
+                        <h3 className="font-mono text-[10px] font-black uppercase mb-3 text-crab-accent flex items-center gap-2">
+                          <span className="w-2 h-2 bg-crab-accent"></span>
+                          AI Architecture Summary
+                        </h3>
+                        <p className="font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-white/70 italic">{aiSummary}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ─── ANALYTICS TAB ─── */}
+                {leftTab === "analytics" && profileData && (
+                  <div className="max-w-5xl mx-auto p-6 space-y-6 animate-fade-in">
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-[0.5em] text-crab-accent mb-2">Analytics</p>
+                      <h2 className="text-xl font-black uppercase tracking-tight">Data Quality</h2>
+                      <p className="font-mono text-xs text-black/40 mt-1 uppercase">Session {sessionId?.slice(0, 8)} · {profileData.summary.total_tables} tables</p>
+                    </div>
+
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-0 border-2 border-black divide-x divide-black transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                      {[
+                        { label: "TABLES", value: profileData.summary.total_tables, accent: false },
+                        { label: "ROWS", value: profileData.summary.total_rows.toLocaleString(), accent: false },
+                        { label: "COLUMNS", value: profileData.summary.total_columns, accent: false },
+                        { label: "COMPLETE", value: `${profileData.summary.overall_completeness}%`, accent: true },
+                        { label: "DEPTH", value: `D${profileData.summary.depth_code}`, accent: true },
+                      ].map((card, i) => (
+                        <div key={i} className={`p-4 bg-white relative overflow-hidden`}>
+                          {card.accent && <div className="absolute top-0 left-0 w-full h-1.5 bg-crab-accent" />}
+                          <p className="font-mono text-[8px] uppercase text-black/40 tracking-widest">{card.label}</p>
+                          <p className={`font-mono text-xl font-black mt-1 ${card.accent ? "text-crab-accent" : "text-black"}`}>
+                            {card.value}
+                          </p>
                         </div>
                       ))}
                     </div>
-                  </div>
-                ))}
 
-                {/* Unlock Chat Button */}
-                {currentStep === 4 && (
-                  <div className="flex justify-center pt-4 pb-12">
-                    <button onClick={() => { setCurrentStep(5); setMessages([{ role: "assistant", content: `Pipeline complete. I have access to ${profileData.summary.total_tables} table(s) with ${profileData.summary.total_rows} rows. Ask me anything about your data.` }]); }} className="brutalist-btn-primary !py-4 !w-auto px-16 text-sm font-heading shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-                      UNLOCK AI AGENT
-                    </button>
+                    {/* Per-Table Profiles */}
+                    {Object.entries(profileData.tables).map(([tName, tData]) => (
+                      <div key={tName} className="bg-white border-2 border-black relative group transition-all hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_rgba(255,59,48,0.1)] overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-crab-accent opacity-10 group-hover:opacity-100 transition-opacity" />
+                        <div className="p-4 border-b border-black/10 flex items-center justify-between bg-[#fcfcfc]">
+                          <h3 className="font-mono text-[10px] font-black uppercase text-black/80">{tName}</h3>
+                          <div className="flex items-center gap-4 font-mono text-[9px] uppercase text-black/30">
+                            <span>{tData.row_count} rows</span>
+                            <span>{tData.column_count} cols</span>
+                            <span className={`font-black tracking-tighter ${tData.completeness >= 90 ? "text-green-500" : tData.completeness >= 70 ? "text-yellow-500" : "text-crab-accent"}`}>
+                              {tData.completeness}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="px-4 pt-2 pb-1">
+                          <div className="w-full h-1.5 bg-black/5">
+                            <div className={`h-full transition-all ${tData.completeness >= 90 ? "bg-green-500" : tData.completeness >= 70 ? "bg-yellow-500" : "bg-crab-accent"}`} style={{ width: `${tData.completeness}%` }} />
+                          </div>
+                        </div>
+                        <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {tData.columns.map((col, i) => (
+                            <div key={i} className="p-3 border border-black/10 hover:border-black transition-colors bg-white">
+                              <p className="font-mono text-[9px] font-black uppercase truncate">{col.name}</p>
+                              <p className="font-mono text-[10px] text-black/40 mt-0.5">{col.dtype}</p>
+                              <div className="flex justify-between mt-2 text-[8px] font-mono text-black/25 uppercase">
+                                <span>{col.null_pct}% null</span>
+                                <span>{col.unique_count} uniq</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* RIGHT: Chat Sidebar (Step 5 only) */}
-            {currentStep === 5 && (
-              <aside className="w-2/5 bg-white border-l-2 border-black h-full flex flex-col">
-                <div className="p-4 border-b-2 border-black">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="font-mono text-sm font-black uppercase">CRAB Agent</h2>
-                      <p className="text-[8px] font-mono text-black/30 uppercase mt-0.5">6-Node LangGraph · Router → Analyst | Plotter | Stats</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 bg-green-500 animate-pulse"></div>
-                      <span className="font-mono text-[8px] text-black/30 uppercase">Live</span>
-                    </div>
+            {/* ═══ RIGHT: PERSISTENT CHAT SIDEBAR ═══ */}
+            <aside className="w-[420px] shrink-0 bg-[#f9f9f9] h-full flex flex-col border-l-2 border-black">
+              <div className="p-4 border-b-2 border-black bg-white relative">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-crab-accent shadow-[2px_0_4px_rgba(255,59,48,0.2)]"></div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="font-mono text-sm font-black uppercase tracking-tight">CRAB Agent</h2>
+                    <p className="text-[8px] font-mono text-black/40 uppercase mt-0.5 flex items-center gap-1.5">
+                      <span className="w-1 h-1 bg-crab-accent"></span>
+                      Intelligent Relational Assistant
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 px-2 py-1 bg-green-500/5 border border-green-500/20">
+                    <div className="w-1.5 h-1.5 bg-green-500 animate-pulse rounded-full"></div>
+                    <span className="font-mono text-[8px] text-green-600 font-black uppercase tracking-widest">Active</span>
                   </div>
                 </div>
+              </div>
 
-                <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-                  {messages.map((msg, idx) => (
-                    <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[90%] ${
-                        msg.role === "user" 
-                          ? "bg-black text-white border-2 border-black" 
-                          : "bg-white text-[#1a1a1a] border-2 border-black/20"
-                      }`}>
-                        <div className="p-3">
-                          <p className="font-mono text-[11px] whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+              <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-[92%] transition-all duration-300 ${
+                      msg.role === "user"
+                        ? "bg-black text-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(255,59,48,1)]"
+                        : "bg-white text-[#1a1a1a] border-2 border-black relative overflow-hidden"
+                    }`}>
+                      {msg.role === "assistant" && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-crab-accent/30"></div>
+                      )}
+                      <div className="p-3.5">
+                        <div className="font-mono text-sm whitespace-pre-wrap leading-relaxed antialiased">
+                          <MarkdownRenderer content={msg.content} />
                         </div>
-                        {msg.images && msg.images.length > 0 && (
-                          <div className="border-t border-black/10">
-                            {msg.images.map((img, imgIdx) => (
-                              <div key={imgIdx} className="p-2">
-                                <div className="border border-black/10 overflow-hidden">
-                                  <div className="px-2 py-1 bg-black flex items-center gap-1.5">
+                      </div>
+                      {msg.images && msg.images.length > 0 && (
+                        <div className="border-t-2 border-black bg-black/5">
+                          {msg.images.map((img, imgIdx) => (
+                            <div key={imgIdx} className="p-2.5">
+                              <div className="border-2 border-black overflow-hidden bg-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+                                <div className="px-2 py-1.5 bg-black flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
                                     <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
                                     <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></div>
                                     <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                                    <span className="font-mono text-[7px] text-white/40 ml-1">chart.png</span>
+                                    <span className="font-mono text-[7px] text-white/50 ml-1 uppercase tracking-tighter">visualization.png</span>
                                   </div>
-                                  <img src={`data:image/png;base64,${img}`} alt="Chart" className="w-full" />
+                                  <span className="font-mono text-[7px] text-crab-accent font-black">CRAB_UI</span>
                                 </div>
+                                <img src={`data:image/png;base64,${img}`} alt="Chart" className="w-full grayscale-0 hover:grayscale-0 transition-all duration-500" />
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {chatLoading && (
-                    <div className="flex justify-start">
-                      <div className="p-3 bg-white border-2 border-black/20">
-                        <div className="flex items-center gap-2">
-                          <div className="flex gap-1">
-                            <div className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                            <div className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                            <div className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                          </div>
-                          <span className="font-mono text-[9px] uppercase text-black/30">Routing</span>
+                            </div>
+                          ))}
                         </div>
-                      </div>
+                      )}
                     </div>
-                  )}
-                </div>
-
-                {/* Quick Actions */}
-                {messages.length <= 1 && (
-                  <div className="px-4 py-3 border-t border-black/10">
-                    <p className="text-[8px] font-mono text-black/20 uppercase mb-2">Quick Actions</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {quickActions.map((qa, i) => (
-                        <button key={i} onClick={() => { setChatInput(qa); }} className="px-2 py-1 border border-black/20 text-[8px] font-mono uppercase hover:bg-black hover:text-white hover:border-black transition-colors">
-                          {qa}
-                        </button>
-                      ))}
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="flex justify-start">
+                    <div className="p-3 bg-white border-2 border-black shadow-[3px_3px_0px_0px_rgba(255,59,48,0.2)]">
+                      <div className="flex items-center gap-3">
+                        <div className="flex gap-1.5">
+                          <div className="w-1.5 h-1.5 bg-crab-accent rounded-full animate-[bounce_1s_infinite_0ms]"></div>
+                          <div className="w-1.5 h-1.5 bg-crab-accent rounded-full animate-[bounce_1s_infinite_200ms]"></div>
+                          <div className="w-1.5 h-1.5 bg-crab-accent rounded-full animate-[bounce_1s_infinite_400ms]"></div>
+                        </div>
+                        <span className="font-mono text-[9px] uppercase text-black/50 font-black tracking-widest">Analyzing</span>
+                      </div>
                     </div>
                   </div>
                 )}
+              </div>
 
-                <div className="p-3 border-t-2 border-black">
-                  <form onSubmit={handleSendMessage} className="relative">
-                    <input
-                      type="text"
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="Ask anything about your data..."
-                      className="w-full p-3 pr-10 border-2 border-black font-mono text-xs focus:outline-none focus:border-crab-accent transition-colors"
-                      disabled={chatLoading}
-                    />
-                    <button type="submit" disabled={chatLoading} className="absolute right-3 top-1/2 -translate-y-1/2 text-lg hover:text-crab-accent transition-colors">➔</button>
-                  </form>
+              {/* Quick Actions */}
+              {messages.length <= 1 && (
+                <div className="px-4 py-4 border-t-2 border-black bg-white/50 backdrop-blur-sm">
+                  <p className="text-[9px] font-mono text-black/30 uppercase mb-3 font-black tracking-widest">Recommended Queries</p>
+                  <div className="flex flex-wrap gap-2">
+                    {quickActions.map((qa, i) => (
+                      <button 
+                        key={i} 
+                        onClick={() => { setChatInput(qa); }} 
+                        className="px-3 py-1.5 border-2 border-black/10 bg-white text-[9px] font-mono uppercase hover:bg-black hover:text-white hover:border-black transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_rgba(255,59,48,1)]"
+                      >
+                        {qa}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </aside>
-            )}
+              )}
+
+              <div className="p-4 border-t-2 border-black bg-white">
+                <form onSubmit={handleSendMessage} className="relative group">
+                  <div className="absolute -inset-0.5 bg-crab-accent opacity-0 group-focus-within:opacity-10 transition-opacity pointer-events-none"></div>
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Describe the insight you need..."
+                    className="w-full p-4 pr-12 border-2 border-black font-mono text-[11px] focus:outline-none focus:border-crab-accent focus:shadow-[4px_4px_0px_0px_rgba(255,59,48,1)] transition-all bg-[#ffffff] relative z-10"
+                    disabled={chatLoading}
+                  />
+                  <button 
+                    type="submit" 
+                    disabled={chatLoading || !chatInput.trim()} 
+                    className={`absolute right-4 top-1/2 -translate-y-1/2 text-xl transition-all ${
+                      chatInput.trim() ? "text-crab-accent scale-110" : "text-black/10"
+                    }`}
+                  >
+                    ➔
+                  </button>
+                </form>
+                <p className="text-[7px] font-mono text-black/30 uppercase mt-3 text-center tracking-widest">Powered by LangGraph Agentic Engine</p>
+              </div>
+            </aside>
           </div>
         )}
+
       </div>
     </div>
   );

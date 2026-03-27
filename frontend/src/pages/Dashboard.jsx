@@ -172,7 +172,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex h-screen bg-[#f4f4f0] text-[#1a1a1a] font-sans selection:bg-crab-accent selection:text-white overflow-hidden relative">
+    <div className="flex h-screen bg-white text-[#1a1a1a] font-sans selection:bg-crab-accent selection:text-white overflow-hidden relative">
       {/* Sidebar Overlay */}
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 lg:hidden" onClick={() => setIsSidebarOpen(false)}></div>
@@ -246,17 +246,6 @@ export default function Dashboard() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full overflow-y-auto p-6 lg:p-12">
-        <header className="flex items-center justify-between mb-12">
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1">
-             <div className="w-8 h-1 bg-black mb-1"></div>
-             <div className="w-8 h-1 bg-black mb-1"></div>
-             <div className="w-8 h-1 bg-black"></div>
-          </button>
-          <div className="flex items-center gap-3">
-             <img src={logo} alt="CRAB" className="h-10 w-auto" />
-             <span className="font-heading text-xs border-b-2 border-black">CRAB ENGINE</span>
-          </div>
-        </header>
 
         {selectedFileInfo ? (
           <div className="max-w-6xl mx-auto w-full">
@@ -321,39 +310,37 @@ export default function Dashboard() {
           </div>
         ) : analysisHistory.length > 0 ? (
           <div className="max-w-6xl mx-auto w-full space-y-10">
-            {/* Dashboard Overview Header */}
-            <div className="flex items-end justify-between">
+            <div className="flex items-end justify-between border-b-4 border-black pb-6">
               <div>
                 <h1 className="text-[3rem] md:text-[4rem] font-black leading-[0.85] uppercase -tracking-wider">
-                  Overview
+                  System<br/><span className="text-crab-accent">Status</span>
                 </h1>
-                <p className="font-mono text-sm text-gray-400 mt-2 uppercase">Latest analysis session summary</p>
+                <p className="font-mono text-xs text-gray-400 mt-2 uppercase tracking-widest">Active nodes & Relational Cardinality</p>
               </div>
-              <button onClick={handleStartAnalysisClick} className="brutalist-btn-primary !w-auto !py-3 px-8 text-xs font-heading">
-                NEW ANALYSIS →
+              <button onClick={handleStartAnalysisClick} className="brutalist-btn-primary !w-auto !py-4 px-10 text-xs font-heading">
+                ANALYZER ENGINE
               </button>
             </div>
 
-            {/* Latest Session Quick Stats */}
             {(() => {
               const latest = analysisHistory[0];
               return (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-5 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-                    <p className="font-heading text-[8px] uppercase text-gray-400">Dataset</p>
-                    <p className="font-mono text-lg font-black truncate mt-1">{latest.filename}</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-4 bg-white border-2 border-black">
+                    <p className="font-mono text-[8px] uppercase text-gray-400">Target Dataset</p>
+                    <p className="font-mono text-xs font-black truncate mt-1">{latest.filename}</p>
                   </div>
-                  <div className="p-5 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-                    <p className="font-heading text-[8px] uppercase text-gray-400">Tables</p>
-                    <p className="font-mono text-3xl font-black mt-1">{latest.table_count}</p>
+                  <div className="p-4 bg-white border-2 border-black">
+                    <p className="font-mono text-[8px] uppercase text-gray-400">Resolved Tables</p>
+                    <p className="font-mono text-2xl font-black mt-1">{latest.table_count}</p>
                   </div>
-                  <div className="p-5 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-                    <p className="font-heading text-[8px] uppercase text-gray-400">Relationships</p>
-                    <p className="font-mono text-3xl font-black mt-1">{latest.relationship_count || "—"}</p>
+                  <div className="p-4 bg-white border-2 border-black">
+                    <p className="font-mono text-[8px] uppercase text-gray-400">Total Joins</p>
+                    <p className="font-mono text-2xl font-black mt-1">{latest.relationship_count || "0"}</p>
                   </div>
-                  <div className="p-5 bg-crab-accent text-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-                    <p className="font-heading text-[8px] uppercase text-white/60">Type</p>
-                    <p className="font-mono text-xl font-black mt-1">{latest.file_type}</p>
+                  <div className="p-4 bg-black text-white border-2 border-black">
+                    <p className="font-mono text-[8px] uppercase text-gray-500">Node Type</p>
+                    <p className="font-mono text-sm font-black mt-1 uppercase tracking-widest">{latest.file_type}</p>
                   </div>
                 </div>
               );
@@ -437,37 +424,47 @@ export default function Dashboard() {
             </div>
 
             {/* Quick Actions */}
-            <div className="flex gap-4 pb-12">
-              <button onClick={handleStartAnalysisClick} className="flex-1 brutalist-btn-primary !py-5 text-sm font-heading">START NEW PIPELINE</button>
-              <button onClick={handleStartBackup} disabled={backupLoading} className="flex-1 brutalist-btn-secondary !py-5 text-sm font-heading">{backupLoading ? "BACKING UP..." : "SYSTEM BACKUP"}</button>
+            <div className="flex gap-4 pb-12 border-t-4 border-black pt-8">
+              <button 
+                onClick={handleStartAnalysisClick} 
+                className="flex-1 brutalist-btn-primary !py-6 text-sm font-heading shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
+              >
+                ANALYZER ENGINE
+              </button>
+              <button 
+                onClick={handleStartBackup} 
+                disabled={backupLoading} 
+                className="flex-1 brutalist-btn-secondary !py-6 text-sm font-heading"
+              >
+                {backupLoading ? "EXECUTING BACKUP..." : "INITIATE SYSTEM BACKUP"}
+              </button>
             </div>
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto w-full flex flex-col lg:flex-row lg:items-end lg:justify-between gap-12 mt-12">
-            <div className="flex-1">
-              <h1 className="text-[4rem] md:text-[5rem] font-black leading-[0.85] uppercase mb-8 -tracking-wider">
-                ANALYZE<br />BETTER<br />WITH<br />
-                <span className="font-heading text-[2.5rem] md:text-[3rem] text-crab-accent mt-4 block">CRAB</span>
-              </h1>
-              <p className="font-mono text-lg font-normal max-w-[400px]">The ultimate AI-powered platform for relational discovery.</p>
-            </div>
-            <div className="w-full lg:max-w-[450px]">
-              <div onClick={handleCrabItClick} className={`group relative p-10 md:p-14 bg-white border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
-                <h2 className="text-5xl md:text-6xl font-black uppercase tracking-tighter mb-4 text-[#1a1a1a]">{loading ? 'PARSING...' : 'CRAB IT'}</h2>
-                <p className="font-mono text-sm font-bold uppercase tracking-widest text-black">DROP .DB .CSV .SQL</p>
-                <div className="absolute top-0 left-0 w-8 h-8 border-t-8 border-l-8 border-black"></div>
-                <div className="absolute top-0 right-0 w-8 h-8 border-t-8 border-r-8 border-black"></div>
-                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-8 border-l-8 border-black"></div>
-                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-8 border-r-8 border-black"></div>
+          <div className="flex-1 flex flex-col items-center justify-center -mt-12">
+            {/* Logo Centerpiece */}
+            <div className="flex flex-col items-center gap-12 w-full">
+              <div className="w-80 h-80 md:w-[28rem] md:h-[28rem] flex items-center justify-center transition-transform hover:scale-105 duration-700">
+                <img src={logo} alt="CRAB" className="w-full h-auto object-contain" />
               </div>
-              <input type="file" ref={fileInputRef} className="hidden" accept=".db,.csv,.sql" onChange={handleFileChange} />
-              <button onClick={handleCrabItClick} className="mt-12 brutalist-btn-primary !py-5 text-xl">START ANALYSIS</button>
+              
+              <div className="text-center">
+                <p className="font-mono text-[10px] uppercase tracking-[0.5em] text-black opacity-30 font-black">
+                  Comprehensive Relational Analyzer and Builder
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-10">
+              <button 
+                onClick={handleStartAnalysisClick} 
+                className="brutalist-btn-primary !py-3 !px-10 text-sm font-heading shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all"
+              >
+                ANALYZER ENGINE
+              </button>
             </div>
           </div>
         )}
-        <footer className="mt-auto pt-20 flex justify-center opacity-10">
-           <span className="font-heading text-[8vw] uppercase select-none opacity-20 transform -rotate-2">SYSTEM_ACTIVE</span>
-        </footer>
       </main>
     </div>
   );

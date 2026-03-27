@@ -45,13 +45,13 @@ const Login = () => {
 
       <div className="max-w-[450px] w-full text-center">
         <h1 className="text-[3.5rem] font-black leading-[0.9] uppercase mb-5 text-left -tracking-wider text-[#1a1a1a]">
-          ANALYZE<br />
-          BETTER WITH<br />
+          WELCOME<br />
+          BACK TO<br />
           <span className="font-heading text-[2rem] tracking-normal block mt-4 text-crab-accent">CRAB</span>
         </h1>
         
-        <p className="font-mono text-base font-normal text-black text-left mb-10 leading-relaxed">
-          The ultimate AI-powered platform for deep CSV analysis. 
+        <p className="font-mono text-sm font-normal text-black/50 text-left mb-10 leading-relaxed">
+          Comprehensive Relational Analyzer and Builder
         </p>
 
         <form className="flex flex-col gap-4" onSubmit={handleLogin}>

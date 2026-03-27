@@ -54,9 +54,8 @@ const Register = () => {
           <span className="font-heading text-3xl tracking-normal block mt-4 text-crab-accent">ACCOUNT</span>
         </h1>
         
-        <p className="font-mono text-sm font-normal text-black text-left mb-8 leading-relaxed">
-          Join the CRAB platform to analyze your CSV data with 
-          advanced AI models and secure cloud storage.
+        <p className="font-mono text-sm font-normal text-black/50 text-left mb-8 leading-relaxed">
+          Comprehensive Relational Analyzer and Builder.
         </p>
 
         <form className="flex flex-col gap-4" onSubmit={handleRegister}>

@@ -15,15 +15,15 @@ const CsvDataTable = ({ data, columns }) => {
   if (!data.length) return null;
 
   return (
-    <div className="w-full overflow-x-auto border-4 border-black bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] mb-12">
+    <div className="w-full overflow-x-auto">
       <table className="w-full text-left border-collapse">
-        <thead className="bg-[#1a1a1a] text-white">
+        <thead className="bg-black text-white">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className="p-4 font-heading text-[10px] tracking-tighter border-b-4 border-black uppercase text-crab-accent"
+                  className="p-3 font-mono text-[9px] tracking-wider border-b-2 border-black uppercase text-white/60"
                 >
                   {header.isPlaceholder
                     ? null
@@ -36,13 +36,13 @@ const CsvDataTable = ({ data, columns }) => {
             </tr>
           ))}
         </thead>
-        <tbody className="divide-y-2 divide-black">
+        <tbody className="divide-y divide-black/5">
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className="hover:bg-crab-accent/5 transition-colors">
+            <tr key={row.id} className="hover:bg-black/[0.02] transition-colors">
               {row.getVisibleCells().map((cell) => (
                 <td
                   key={cell.id}
-                  className="p-4 font-mono text-xs border-r-2 border-black last:border-r-0"
+                  className="p-3 font-mono text-[11px] text-black/60 border-r border-black/5 last:border-r-0"
                 >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>

@@ -2,15 +2,30 @@
 @import "tailwindcss";
 
 @theme {
-  --color-crab-accent: #FF3B30; /* Bright red/orange accent */
+  --color-crab-accent: #FF3B30;
   --font-heading: "Press Start 2P", system-ui, sans-serif;
   --font-sans: "Inter", system-ui, sans-serif;
 }
 
 @layer base {
   body {
-    background-color: #f4f4f0;
+    background-color: #ffffff;
     color: #1a1a1a;
+  }
+
+  /* ── Global scrollbar hiding ── */
+  * {
+    scrollbar-width: none;          /* Firefox */
+    -ms-overflow-style: none;       /* IE/Edge */
+  }
+  *::-webkit-scrollbar {
+    display: none;                  /* Chrome/Safari/Opera */
+  }
+
+  /* ── Smooth transitions globally ── */
+  ::selection {
+    background-color: #FF3B30;
+    color: white;
   }
 }
 
@@ -35,4 +50,32 @@
   .brutalist-text-stroke-thin {
     -webkit-text-stroke: 1px black;
   }
+
+  /* ── Graph container: prevents ForceGraph2D overflow ── */
+  .graph-container {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+  }
+  .graph-container canvas {
+    display: block;
+  }
+
+  /* ── Micro-animation utilities ── */
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out both;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.5s ease-out both;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 }

@@ -4,7 +4,7 @@ CRAB Advanced Agentic Data Analysis Engine
 Multi-node LangGraph with:
   • Router → classifies intent
   • Analyst → pandas queries and data exploration  
-  • Plotter → generates matplotlib charts (returned as base64)
+  • Plotter → generates matplotlib/seaborn charts (returned as base64)
   • Statistician → deep statistical analysis
   • Responder → synthesizes final answer
 
@@ -17,8 +17,14 @@ import re
 import json
 import base64
 import traceback
+import builtins
 import pandas as pd
 import numpy as np
+import seaborn as sns
+try:
+    sns.set_theme(style="whitegrid", palette=["#FF3B30", "#4DA6FF", "#34C759", "#1A1A1A", "#FF9500", "#8B5CF6"])
+except Exception:
+    pass
 from typing import TypedDict, Annotated, List, Optional, Literal
 from langchain_openai import ChatOpenAI
 from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
@@ -174,11 +180,11 @@ When showing numbers, format them nicely (commas, percentages, etc.)."""
         return {"tool_output": error_msg, "error": str(e)}
 
 # ════════════════════════════════════════════════════════
-#  NODE 3: PLOTTER — Generates matplotlib charts
+#  NODE 3: PLOTTER — Generates matplotlib/seaborn charts
 # ════════════════════════════════════════════════════════
 
 def plotter_node(state: AgentState) -> dict:
-    """Generates charts using matplotlib based on user request."""
+    """Generates charts using matplotlib/seaborn based on user request."""
     import matplotlib
     matplotlib.use('Agg')  # Non-interactive backend
     import matplotlib.pyplot as plt
@@ -204,7 +210,7 @@ def plotter_node(state: AgentState) -> dict:
             [f'  {name}  # pd.DataFrame, {len(df)} rows, columns: {list(df.columns)[:8]}' for name, df in dfs_dict.items()]
         )
     
-    code_prompt = f"""Generate matplotlib Python code to visualize data. Output ONLY code, nothing else.
+    code_prompt = f"""Generate matplotlib/seaborn Python code to visualize data. Output ONLY raw Python code.
 
 DATA SCHEMA:
 {tables_info[:3000]}
@@ -213,20 +219,39 @@ DATA SCHEMA:
 
 REQUEST: "{last_msg}"
 
-STRICT RULES — YOU MUST FOLLOW ALL:
-- matplotlib.pyplot is already imported as plt
-- pandas is already imported as pd  
-- numpy is already imported as np
-- Start with: plt.figure(figsize=(10, 6))
-- NEVER use plt.savefig() or fig.savefig() — FORBIDDEN
-- NEVER use plt.show() — FORBIDDEN
-- NEVER use open(), write(), or any file operations — FORBIDDEN
-- NEVER reference any file paths — FORBIDDEN
-- Just create the figure with plt commands, I capture it automatically
-- Use colors: #FF3B30, #4DA6FF, #34C759, #1A1A1A, #FF9500, #8B5CF6
-- Add a title and axis labels
-- Output RAW Python code only. No markdown. No ``` fences. No explanation."""
+ALREADY IMPORTED & AVAILABLE:
+- matplotlib.pyplot as plt
+- pandas as pd
+- numpy as np
+- seaborn as sns
+- All DataFrames are already loaded by their table names listed above.
 
+STRICT RULES — FOLLOW ALL:
+1. Start with: plt.figure(figsize=(10, 6))
+2. NEVER use plt.savefig(), fig.savefig() — FORBIDDEN
+3. NEVER use plt.show() — FORBIDDEN
+4. NEVER use open(), write(), or any file operations — FORBIDDEN
+5. NEVER import os, subprocess, sys, shutil — FORBIDDEN
+6. You CAN import from: sklearn, scipy, collections, itertools, math, datetime
+7. Just create the figure with plt/sns commands, it is captured automatically
+8. Use these brand colors: #FF3B30, #4DA6FF, #34C759, #1A1A1A, #FF9500, #8B5CF6
+9. Always add a descriptive title and axis labels
+10. Use plt.tight_layout() at the end
+11. For categorical data with many labels, rotate x-ticks: plt.xticks(rotation=45, ha='right')
+
+CHART TYPE GUIDANCE (pick the BEST one for the request):
+- Bar chart: comparisons between categories
+- Line chart: trends over time or sequences
+- Scatter plot: correlations between two numeric columns
+- Histogram: distribution of a single column
+- Pie chart: proportions of categories (use plt.pie with autopct='%1.1f%%')
+- Box plot: distribution comparison across groups
+- Heatmap: correlation matrix (sns.heatmap)
+- Violin plot: distribution shape comparison (sns.violinplot)
+- Pair plot: multi-variable relationships (sns.pairplot — returns fig directly)
+
+Output RAW Python code only. No markdown. No ``` fences. No explanation text."""
+    
     try:
         response = llm.invoke([HumanMessage(content=code_prompt)])
         code = response.content.strip()
@@ -241,23 +266,47 @@ STRICT RULES — YOU MUST FOLLOW ALL:
         code = re.sub(r'plt\.show\s*\(\s*\)', '# show removed', code)
         code = re.sub(r'fig\.show\s*\(\s*\)', '# show removed', code)
         
+        # Remove dangerous imports via regex
+        code = re.sub(r'import\s+os\b', '# blocked import', code)
+        code = re.sub(r'import\s+subprocess\b', '# blocked import', code)
+        code = re.sub(r'import\s+sys\b', '# blocked import', code)
+        code = re.sub(r'import\s+shutil\b', '# blocked import', code)
+        
         print(f"🎨 PLOTTER → Generated code:\n{code[:300]}...")
         
         # Clear any existing figures
         plt.close('all')
         
-        # Execute the code with dataframes in scope — safe builtins
-        safe_builtins = {
-            'print': print, 'len': len, 'range': range, 'list': list,
-            'dict': dict, 'str': str, 'int': int, 'float': float,
-            'max': max, 'min': min, 'sum': sum, 'abs': abs,
-            'round': round, 'sorted': sorted, 'enumerate': enumerate,
-            'zip': zip, 'map': map, 'filter': filter, 'isinstance': isinstance,
-            'True': True, 'False': False, 'None': None,
-            'tuple': tuple, 'set': set, 'type': type, 'bool': bool,
+        # ── Controlled sandbox: allow imports except dangerous ones ──
+        BLOCKED_MODULES = {
+            'os', 'subprocess', 'sys', 'shutil', 'pathlib',
+            'socket', 'http', 'urllib', 'requests',
+            'ftplib', 'smtplib', 'ctypes', 'webbrowser'
         }
         
-        exec_globals = {'__builtins__': safe_builtins, 'pd': pd, 'np': np, 'plt': plt}
+        _real_import = __import__
+        
+        def safe_import(name, *args, **kwargs):
+            root_module = name.split('.')[0]
+            if root_module in BLOCKED_MODULES:
+                raise ImportError(f"Import of '{name}' is not allowed in chart generation.")
+            return _real_import(name, *args, **kwargs)
+        
+        # Copy full builtins but replace import and remove file ops
+        safe_builtins = {k: v for k, v in vars(builtins).items()}
+        safe_builtins['__import__'] = safe_import
+        safe_builtins.pop('open', None)
+        safe_builtins.pop('exec', None)       # no nested exec
+        safe_builtins.pop('compile', None)     # no compile
+        
+        exec_globals = {
+            '__builtins__': safe_builtins,
+            'pd': pd,
+            'np': np,
+            'plt': plt,
+        }
+        if sns is not None:
+            exec_globals['sns'] = sns
         exec_locals = {**dfs_dict}
         
         exec(code, exec_globals, exec_locals)
@@ -413,7 +462,6 @@ def responder_node(state: AgentState) -> dict:
     
     # Construct response with metadata
     if images:
-        # Include image markers that the frontend can parse
         response_text = tool_output + "\n\n" + "\n".join([f"[CHART_IMAGE:{img[:20]}...]" for img in images])
     else:
         response_text = tool_output

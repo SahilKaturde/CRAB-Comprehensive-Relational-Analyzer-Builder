@@ -441,10 +441,10 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center -mt-12">
+          <div className="flex-1 flex flex-col items-center justify-center -mt-20">
             {/* Logo Centerpiece */}
-            <div className="flex flex-col items-center gap-12 w-full">
-              <div className="w-80 h-80 md:w-[28rem] md:h-[28rem] flex items-center justify-center transition-transform hover:scale-105 duration-700">
+            <div className="flex flex-col items-center gap-6 w-full">
+              <div className="w-96 h-96 md:w-[32rem] md:h-[32rem] flex items-center justify-center">
                 <img src={logo} alt="CRAB" className="w-full h-auto object-contain" />
               </div>
               
@@ -455,7 +455,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="mt-10">
+            <div className="mt-8">
               <button 
                 onClick={handleStartAnalysisClick} 
                 className="brutalist-btn-primary !py-3 !px-10 text-sm font-heading shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all"

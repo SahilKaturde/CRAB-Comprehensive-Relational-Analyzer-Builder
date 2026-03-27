@@ -418,25 +418,48 @@ export default function Analyzer() {
 
         {/* ══════ STEP 2: CONVERT + BACKUP ══════ */}
         {currentStep === 2 && (
-          <div className="max-w-5xl mx-auto w-full py-10 px-6 space-y-8 animate-fade-in">
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.5em] text-black/30 mb-2">Step 02</p>
-              <h2 className="text-3xl font-black uppercase tracking-tight">Datasets Loaded</h2>
-              <p className="font-mono text-xs text-black/40 mt-1 uppercase">{tables.length} table(s) from {rawFiles.length} file(s)</p>
+          <div className="max-w-5xl mx-auto w-full py-10 px-6 space-y-10 animate-fade-in">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b-2 border-black/5 pb-8">
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 border-2 border-crab-accent/20 p-2 shrink-0">
+                  <img src={logo} alt="CRAB" className="w-full h-full object-contain" />
+                </div>
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.5em] text-crab-accent mb-2">Step 02</p>
+                  <h2 className="text-3xl font-black uppercase tracking-tight">Datasets Loaded</h2>
+                  <p className="font-mono text-xs text-black/40 mt-1 uppercase leading-none">{tables.length} table(s) found across {rawFiles.length} file(s)</p>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {tables.map(t => {
                 const info = filesData[t]?.info;
                 const isConverted = info?.converted;
+                const isSelected = selectedTable === t;
                 return (
-                  <button key={t} onClick={() => loadLocalTable(t)} className={`p-4 text-left border-2 transition-all ${selectedTable === t ? "bg-black text-white border-black" : "bg-white border-black/20 hover:border-black"}`}>
-                    <p className="font-mono text-[10px] font-black uppercase truncate">{info?.name || t}</p>
-                    <div className={`flex items-center gap-2 mt-2 text-[8px] uppercase ${selectedTable === t ? "text-white/50" : "text-black/30"}`}>
-                      <span>{info?.type}</span>
+                  <button 
+                    key={t} 
+                    onClick={() => loadLocalTable(t)} 
+                    className={`group p-5 text-left border-2 transition-all relative ${
+                      isSelected 
+                        ? "bg-white border-crab-accent shadow-[4px_4px_0px_0px_rgba(255,59,48,1)] translate-x-[-2px] translate-y-[-2px]" 
+                        : "bg-white border-black/10 hover:border-black/40 shadow-none"
+                    }`}
+                  >
+                    {isSelected && <div className="absolute top-0 left-0 w-full h-1 bg-crab-accent" />}
+                    <p className={`font-mono text-[10px] font-black uppercase truncate ${isSelected ? "text-crab-accent font-black" : "text-black/70"}`}>
+                      {info?.name || t}
+                    </p>
+                    <div className="flex items-center gap-2 mt-3 text-[8px] uppercase font-mono tracking-widest text-black/30">
+                      <span className={isSelected ? "text-crab-accent/60" : ""}>{info?.type}</span>
                       <span>•</span>
-                      <span>{info?.size}</span>
-                      {isConverted && <span className="ml-auto bg-crab-accent text-white px-1.5 py-0.5 font-black text-[7px]">CONVERTED</span>}
+                      <span className={isSelected ? "text-crab-accent/60" : ""}>{info?.size}</span>
+                      {isConverted && (
+                        <span className="ml-auto bg-crab-accent text-white px-2 py-0.5 font-black text-[7px] leading-none">
+                          CSV_SYNCED
+                        </span>
+                      )}
                     </div>
                   </button>
                 );

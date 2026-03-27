@@ -40,6 +40,8 @@ langsmith==0.7.22
 marshmallow==3.26.2
 matplotlib==3.10.8
 multidict==6.7.1
+scikit-learn==1.7.0
+seaborn==0.13.3
 mypy_extensions==1.1.0
 numpy==2.4.3
 openai==2.30.0

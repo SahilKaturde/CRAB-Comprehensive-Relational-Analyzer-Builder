@@ -154,17 +154,23 @@ def analyst_node(state: AgentState) -> dict:
         list(dfs_dict.values()),
         verbose=True,
         allow_dangerous_code=True,
+        max_iterations=100000,
         handle_parsing_errors=True,
-        prefix=f"""You are a data analyst. You have access to {len(dfs_dict)} pandas DataFrames.
-Table names: {list(dfs_dict.keys())}
-
-The DataFrames are available as df, df1, df2, etc. (in order of: {list(dfs_dict.keys())}).
-If there's only one DataFrame, it's 'df'.
+        prefix=f"""You are a master data analyst for the CRAB engine.
+You have access to {len(dfs_dict)} DataFrames: {list(dfs_dict.keys())}
+The DataFrames are mapped to variables df, df1, df2... in that exact order.
 
 {state.get('graph_context', '')}
 
-Always provide clear, formatted answers. Use markdown tables where appropriate.
-When showing numbers, format them nicely (commas, percentages, etc.)."""
+STRICT FORMATTING RULES:
+1. You must only use the 'python_repl_ast' tool.
+2. The 'Action Input' must contain ONLY valid Python code. NEVER append text or thoughts after the code.
+3. If you get an error, rethink and try a different approach.
+4. Do not output anything other than Thought: [your thought], Action: python_repl_ast, Action Input: [code].
+
+The user wants clear, formatted answers with markdown tables. 
+CRITICAL: Even if you provide a table, you MUST also provide a 2-3 sentence textual summary or interpretation of the results to provide context. Relate the numbers back to the user's question.
+Whenever you mention the tool you used, refer to it as **python_repl_ast**."""
     )
     
     last_msg = state["messages"][-1].content
@@ -226,12 +232,12 @@ ALREADY IMPORTED & AVAILABLE:
 - seaborn as sns
 - All DataFrames are already loaded by their table names listed above.
 
-STRICT RULES — FOLLOW ALL:
+STRICT RULES - FOLLOW ALL:
 1. Start with: plt.figure(figsize=(10, 6))
-2. NEVER use plt.savefig(), fig.savefig() — FORBIDDEN
-3. NEVER use plt.show() — FORBIDDEN
-4. NEVER use open(), write(), or any file operations — FORBIDDEN
-5. NEVER import os, subprocess, sys, shutil — FORBIDDEN
+2. NEVER use plt.savefig(), fig.savefig() - FORBIDDEN
+3. NEVER use plt.show() - FORBIDDEN
+4. NEVER use open(), write(), or any file operations - FORBIDDEN
+5. NEVER import os, subprocess, sys, shutil - FORBIDDEN
 6. You CAN import from: sklearn, scipy, collections, itertools, math, datetime
 7. Just create the figure with plt/sns commands, it is captured automatically
 8. Use these brand colors: #FF3B30, #4DA6FF, #34C759, #1A1A1A, #FF9500, #8B5CF6
@@ -248,7 +254,7 @@ CHART TYPE GUIDANCE (pick the BEST one for the request):
 - Box plot: distribution comparison across groups
 - Heatmap: correlation matrix (sns.heatmap)
 - Violin plot: distribution shape comparison (sns.violinplot)
-- Pair plot: multi-variable relationships (sns.pairplot — returns fig directly)
+- Pair plot: multi-variable relationships (sns.pairplot - returns fig directly)
 
 Output RAW Python code only. No markdown. No ``` fences. No explanation text."""
     
@@ -277,7 +283,7 @@ Output RAW Python code only. No markdown. No ``` fences. No explanation text."""
         # Clear any existing figures
         plt.close('all')
         
-        # ── Controlled sandbox: allow imports except dangerous ones ──
+        # - Controlled sandbox: allow imports except dangerous ones -
         BLOCKED_MODULES = {
             'os', 'subprocess', 'sys', 'shutil', 'pathlib',
             'socket', 'http', 'urllib', 'requests',
@@ -460,6 +466,9 @@ def responder_node(state: AgentState) -> dict:
     intent = state.get("intent", "general")
     images = state.get("images", [])
     
+    # Bold common tool names/addresses for visual clarity
+    tool_output = re.sub(r'(python_repl_ast|router_node|analyst_node|plotter_node|statistician_node|general_node)', r'**\1**', tool_output)
+    
     # Construct response with metadata
     if images:
         response_text = tool_output + "\n\n" + "\n".join([f"[CHART_IMAGE:{img[:20]}...]" for img in images])
@@ -492,22 +501,6 @@ def route_by_intent(state: AgentState) -> str:
 # ════════════════════════════════════════════════════════
 #  BUILD THE LANGGRAPH
 # ════════════════════════════════════════════════════════
-"""
-Flow:
-                    ┌──────────┐
-           ┌────── │  ROUTER  │ ──────┐
-           │       └──────────┘       │
-     ┌─────▼────┐  ┌────▼───┐  ┌─────▼──────┐  ┌───▼────┐
-     │ ANALYST  │  │PLOTTER │  │STATISTICIAN│  │GENERAL │
-     └─────┬────┘  └────┬───┘  └─────┬──────┘  └───┬────┘
-           │            │            │              │
-           └────────────┴────────────┴──────────────┘
-                              │
-                       ┌──────▼──────┐
-                       │  RESPONDER  │
-                       └─────────────┘
-"""
-
 workflow = StateGraph(AgentState)
 
 # Add all nodes

@@ -41,7 +41,6 @@ INSTALLED_APPS = [
 
 EXTERNAL_APP = [
     'rest_framework',
-    'test_api',
 ]
 
 INSTALLED_APPS += EXTERNAL_APP

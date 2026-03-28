@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from app.routes import ai
+from app.services.dictionary import init_dict_db
 
 app = FastAPI()
+
+# Initialize Persistent DBs
+init_dict_db()
 
 app.include_router(ai.router, prefix="/ai")
 

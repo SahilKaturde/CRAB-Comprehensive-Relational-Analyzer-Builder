@@ -17,11 +17,40 @@ export const authService = {
 
     const result = await res.json();
 
-    // Store tokens
+    // Store tokens and user info
     localStorage.setItem("access", result.access);
     localStorage.setItem("refresh", result.refresh);
+    
+    if (result.user) {
+      localStorage.setItem("username", result.user.username);
+      localStorage.setItem("email", result.user.email);
+    }
 
     return result;
+  },
+
+  getUser: () => {
+    return {
+      username: localStorage.getItem("username"),
+      email: localStorage.getItem("email")
+    };
+  },
+
+  fetchMe: async () => {
+    const token = localStorage.getItem("access");
+    if (!token) return null;
+
+    const res = await fetch(`${API}/api/me/`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+
+    if (res.ok) {
+      const result = await res.json();
+      localStorage.setItem("username", result.username);
+      localStorage.setItem("email", result.email);
+      return result;
+    }
+    return null;
   },
 
   register: async (data) => {
@@ -45,6 +74,8 @@ export const authService = {
   logout: () => {
     localStorage.removeItem("access");
     localStorage.removeItem("refresh");
+    localStorage.removeItem("username");
+    localStorage.removeItem("email");
   },
 
   isAuthenticated: () => {

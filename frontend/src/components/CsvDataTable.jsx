@@ -23,7 +23,7 @@ const CsvDataTable = ({ data, columns }) => {
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className="p-3 font-mono text-[9px] tracking-wider border-b-2 border-black uppercase text-white/60"
+                  className="px-3 py-2 font-mono text-[10px] tracking-wider border-b-2 border-black uppercase text-white/80"
                 >
                   {header.isPlaceholder
                     ? null
@@ -42,7 +42,7 @@ const CsvDataTable = ({ data, columns }) => {
               {row.getVisibleCells().map((cell) => (
                 <td
                   key={cell.id}
-                  className="p-3 font-mono text-[11px] text-black/60 border-r border-black/5 last:border-r-0"
+                  className="px-3 py-1.5 font-mono text-xs text-black/70 border-r border-black/5 last:border-r-0"
                 >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>

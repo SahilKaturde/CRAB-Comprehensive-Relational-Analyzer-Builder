@@ -93,6 +93,15 @@ def get_tables_info(dfs_dict: dict) -> str:
         info_parts.append(f"TABLE: {name} ({len(df)} rows, {len(df.columns)} cols)\n" + "\n".join(cols))
     return "\n\n".join(info_parts)
 
+def format_history(messages: List[BaseMessage], limit: int = 10) -> str:
+    """Condenses recent chat turns for LLM context."""
+    recent = messages[-limit:]
+    history = []
+    for m in recent:
+        role = "USER" if isinstance(m, HumanMessage) else "AI"
+        history.append(f"{role}: {m.content[:500]}") # Truncate very long past responses
+    return "\n".join(history)
+
 # ════════════════════════════════════════════════════════
 #  NODE 1: ROUTER — Classifies user intent
 # ════════════════════════════════════════════════════════
@@ -108,6 +117,9 @@ def router_node(state: AgentState) -> dict:
 - "statistics" — user wants statistical analysis, correlations, distributions, outliers, mean/median/mode
 - "analyze" — user wants to query data, filter, sort, find specific values, count, aggregate, explore data
 - "general" — general question about the schema, greeting, or anything else
+
+History for context:
+{format_history(state["messages"][:-1], limit=3)}
 
 User message: "{last_msg}"
 
@@ -168,9 +180,13 @@ STRICT FORMATTING RULES:
 3. If you get an error, rethink and try a different approach.
 4. Do not output anything other than Thought: [your thought], Action: python_repl_ast, Action Input: [code].
 
+PREVIOUS CONVERSATION CONTEXT:
+{format_history(state["messages"][:-1], limit=10)}
+
 The user wants clear, formatted answers with markdown tables. 
 CRITICAL: Even if you provide a table, you MUST also provide a 2-3 sentence textual summary or interpretation of the results to provide context. Relate the numbers back to the user's question.
-Whenever you mention the tool you used, refer to it as **python_repl_ast**."""
+Whenever you mention the tool you used, refer to it as **python_repl_ast**.
+"""
     )
     
     last_msg = state["messages"][-1].content
@@ -222,6 +238,9 @@ DATA SCHEMA:
 {tables_info[:3000]}
 
 {var_instructions}
+
+HISTORY FOR CONTEXT:
+{format_history(state["messages"][:-1], limit=5)}
 
 REQUEST: "{last_msg}"
 
@@ -438,6 +457,9 @@ def general_node(state: AgentState) -> dict:
 
 AVAILABLE DATA:
 {tables_info}
+
+CONVERSATION HISTORY:
+{format_history(state["messages"][:-1], limit=10)}
 
 Relationship Context: {state.get('graph_context', 'Not provided')}
 

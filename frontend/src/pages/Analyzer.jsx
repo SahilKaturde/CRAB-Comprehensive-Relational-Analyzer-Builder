@@ -1029,7 +1029,7 @@ export default function Analyzer() {
             </div>
 
             {/* ═══ RIGHT: PERSISTENT CHAT SIDEBAR ═══ */}
-            <aside className="w-[420px] shrink-0 bg-[#f9f9f9] h-full flex flex-col border-l-2 border-black">
+            <aside className="w-[475px] shrink-0 bg-[#f9f9f9] h-full flex flex-col border-l-2 border-black">
               <div className="p-4 border-b-2 border-black bg-white relative">
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-crab-accent shadow-[2px_0_4px_rgba(255,59,48,0.2)]"></div>
                 <div className="flex items-center justify-between">

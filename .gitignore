@@ -13,3 +13,8 @@ dist/
 
 # OS
 .DS_Store
+
+echo ai_engine/sessions/ >> .gitignore
+echo *.csv >> .gitignore
+echo *.db >> .gitignore
+echo *.sqlite >> .gitignore
